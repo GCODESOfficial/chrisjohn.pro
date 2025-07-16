@@ -9,8 +9,9 @@ import Link from "next/link";
 
 const links = [
   { label: 'Home', href: '/' },
-  { label: 'About', href: '/About' },
+  { label: 'About', href: '/about' },
   { label: 'Work', href: '/work' },
+  { label: 'Books', href: '/books' },
 ];
 
 export default function Navbar() {
@@ -18,7 +19,7 @@ export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <nav className="w-full font-[Manrope] fixed bg-[#0F0F0F] text-white px-6 md:px-32 py-4 flex justify-between items-center z-50">
+    <nav className="w-full font-[Lato] fixed bg-[#0F0F0F] text-white px-6 md:px-32 py-4 flex justify-between items-center z-50">
       {/* Logo */}
       <Link href="/" className="block">
   <div>
@@ -36,11 +37,7 @@ export default function Navbar() {
           <Link
             key={link.href}
             href={link.href}
-            className={clsx(
-              'text-sm hover:text-white text-[#8E8E8E]  relative',
-              pathname === link.href && 'text-white after:absolute after:left-0 after:-bottom-1 after:w-full py-2 after:h-[2px] after:bg-gradient-to-r after:from-[#0F0F0F] after:via-[#B3B3B3] after:to-[#0F0F0F]  after:transition'
-            )}
-          >
+            className='text-sm hover:text-white text-[#8E8E8E]  relative'          >
             {link.label}
           </Link>
         ))}
@@ -53,7 +50,6 @@ export default function Navbar() {
   rel="noopener noreferrer"
   className="hidden ml-4 px-4 py-1.5 bg-white text-black rounded-full md:flex items-center gap-2 text-sm font-semibold"
 >
-  <span className="h-2 w-2 rounded-full text-sm ping-green-black"></span>
   Let’s Talk
 </a>
 
@@ -86,11 +82,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={clsx(
-                  'text-sm text-[#8E8E8E] relative pb-1',
-                  pathname === link.href &&
-                    'after:absolute after:left-0 after:bottom-0 after:w-14 after:h-[2px] after:bg-gradient-to-r after:from-[#B3B3B3] text-white after:to-[#0F0F0F]  after:transition'
-                )}
+                className='text-sm text-[#8E8E8E] relative pb-1'
                 onClick={() => setMenuOpen(false)}
               >
                 {link.label}
@@ -98,23 +90,13 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Divider and sub-links */}
-          <div className="mt-6 border-t-[1px] font-medium border-[#292929] pt-4 text-xs space-y-2 text-[#696969]">
-          <a href="/consultation" className="block">
-    <p>Book a session</p>
-  </a>
-
-  <a href="/qoute" className="block">
-    <p>Request a quote</p>
-  </a>
-          </div>
 
           {/* Button */}
           <a href="https://t.me/cdslabsxyz"
   target="_blank"
   rel="noopener noreferrer"
    className="mt-6 px-4 py-2 bg-white text-black rounded-full flex items-center gap-2 w-fit text-sm font-semibold">
-            <span className="h-2 w-2 text-sm bg-[#02C659] rounded-full ping-green-black"></span> Let’s Talk
+            Let’s Talk
           </a>
         </div>
       )}

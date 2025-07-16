@@ -1,26 +1,76 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #ffffff;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+@font-face {
+  font-family: 'Lato';
+  src: url('/fonts/Lato-Regular.ttf') format('truetype');
+  font-weight: 100 900; /* or whatever your variable font supports */
+  font-style: normal;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+
+@font-face {
+  font-family: 'Monotype';
+  src: url('/fonts/Monotype-Corsiva-Regular.ttf') format('truetype');
+  font-weight: 100 900; 
+  font-style: normal;
 }
+
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Satoshi', 'Monotype', 'Lato';
 }
+
+html {
+	scroll-behavior: smooth;
+  }
+
+  @keyframes scrollX {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+    }
+    
+    .animate-scroll-x {
+    animation: scrollX 20s linear infinite;
+    display: flex;
+    flex-wrap: nowrap;
+    will-change: transform;
+    }
+
+    @keyframes marquee-left {
+      0% {
+        transform: translateX(0%);
+      }
+      100% {
+        transform: translateX(-50%);
+      }
+    }
+    
+    @keyframes marquee-right {
+      0% {
+        transform: translateX(-50%);
+      }
+      100% {
+        transform: translateX(0%);
+      }
+    }
+    
+    .animate-marquee-left {
+      animation: marquee-left 40s linear infinite;
+    }
+    
+    .animate-marquee-right {
+      animation: marquee-right 40s linear infinite;
+    }
+    
