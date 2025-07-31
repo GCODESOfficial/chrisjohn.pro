@@ -4,8 +4,8 @@ import Image from 'next/image';
 
 export default function Footer() {
   return (
-    <footer className="bg-black text-white py-8 flex flex-col items-center gap-4 font-[Lato]">
-      <div className="bg-[#0D0D0D] rounded-full px-6 py-3 flex items-center gap-4 border border-[#2F2F2F]">
+    <footer className="bg-white/5 w-10/12 mx-auto text-white py-6 mb-10 rounded-3xl mt-24 flex flex-col items-center gap-4 font-[Lato]">
+      <div className="bg-[#0D0D0D] rounded-full px-3 py-3 flex items-center gap-4 border border-[#2F2F2F]">
         {/* Logo */}
         <div className="flex items-center gap-2">
           <Image
@@ -13,6 +13,7 @@ export default function Footer() {
             alt="Logo"
             width={40}
             height={40}
+            className='w-full h-full'
           />
         </div>
 

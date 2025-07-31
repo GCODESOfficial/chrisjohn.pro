@@ -2,13 +2,16 @@
 'use client';
 
 import Image from 'next/image';
+import Voice from '../components/voice';
+import SpecializationsSection from '../components/SpecializationsSection';
+import EcosystemSection from '../components/EcosystemSection';
 
 export default function About() {
   return (
-    <div className="min-h-screen font-[Lato] bg-black text-white flex flex-col items-center px-4 py-10 space-y-10">
+    <div className="min-h-screen font-[Lato] bg-black text-white flex flex-col items-center px-4 space-y-10">
       {/* TCJ Logo + Image */}
-      <div className="relative w-full max-w-4xl flex flex-col items-center">
-        <div className="text-[120px] font-serif font-bold text-white/10 z-10 absolute top-10 select-none">
+      <div className="relative w-full pt-48 max-w-5xl flex flex-col items-center bg-white/5">
+        <div className="text-[320px] font-[Monotype] font-extrabold text-white z-0 absolute -top-0 select-none">
           TCJ
         </div>
 
@@ -16,21 +19,25 @@ export default function About() {
           <Image
             src="/images/john.svg" // Replace with your actual image path
             alt="Chris John"
-            width={300}
-            height={300}
+            width={500}
+            height={400}
             className="rounded-md object-cover"
           />
         </div>
+
+        {/* Blush to background */}
+      <div className="absolute bottom-0 left-0 w-full h-20 z-30 bg-gradient-to-b from-transparent via-black to-black pointer-events-none" />
+
       </div>
 
       {/* Title and Role */}
-      <div className="text-center text-white text-lg italic font-light max-w-2xl">
+      <div className="text-center py-10 font-[Monotype] text-[#E3E3E3] text-2xl italic font-light max-w-lg">
         I’m Chris John, Serial Entrepreneur, Branding Expert, Business
         Developer, AI & Blockchain Consultant.
       </div>
 
       {/* Bio Box */}
-      <div className="bg-neutral-900 text-gray-300 rounded-xl p-6 max-w-3xl w-full text-sm leading-relaxed">
+      <div className="bg-[#0D0D0D] text-[#A8A8A8] rounded-xl py-20 max-w-5xl w-full leading-relaxed px-60">
         <p className="mb-4">
           Chris John is a dynamic creative force from Akwa Ibom, Nigeria. As a serial entrepreneur, he
           leads projects across branding, tech, and education.
@@ -41,6 +48,12 @@ export default function About() {
           transformation through clarity and creativity.
         </p>
       </div>
+
+      <SpecializationsSection />
+
+      <EcosystemSection />
+
+      <Voice />
     </div>
   );
 }

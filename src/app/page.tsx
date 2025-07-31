@@ -1,6 +1,5 @@
 "use client";
 import Image from 'next/image';
-import Link from 'next/link';
 import HeroSection from './components/HeroSection';
 import Meet from './components/meet';
 import WaysHelp from './components/WaysHelp';
@@ -14,8 +13,8 @@ const Home = () => {
   return (
     <div className='font-[Lato]'>
       <HeroSection />
-
-      <div className="w-11/12 h-[600px] mx-auto mt-16 rounded-2xl">
+	  <div className='max-w-5xl w-5xl mx-auto py-20'>
+      <div className="max-w-5xl w-5xl h-[450px] mx-auto rounded-2xl">
 					<video
 						src="/placeholdervideo.mp4"
 						width={150}
@@ -24,15 +23,16 @@ const Home = () => {
 						muted
 						loop
 						playsInline
-						className="w-full h-[600px] rounded-2xl object-cover"
+						className="w-full h-[450px] rounded-2xl object-cover"
 					/>
+				</div>
 				</div>
 
         <Meet />
 
 
         {/* Logos */}
-					<div className="flex  items-center justify-center gap-6 md:mt-28 mt-12">
+					<div className="flex  items-center justify-center gap-6 md:mt-10 mt-12">
 						<div className="relative overflow-hidden w-full">
 							<div className="flex animate-scroll-x min-w-max">
 								{[...images, ...images, ...images, ...images, ...images].map(

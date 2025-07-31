@@ -2,7 +2,7 @@
 
 export default function Build() {
   return (
-    <section className="bg-black font-[Lato] text-white py-16 px-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+    <section className="max-w-5xl w-5xl mx-auto font-[Lato] bg-white/5 rounded-3xl text-white py-6 px-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
       {/* Left Text */}
       <div className="max-w-md">
         <h2 className="text-4xl md:text-5xl font-bold mb-2">Let’s Build</h2>

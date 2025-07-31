@@ -73,4 +73,41 @@ html {
     .animate-marquee-right {
       animation: marquee-right 40s linear infinite;
     }
-    
+
+
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes scroll-right {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+.animate-scroll-left {
+  animation: scroll-left 5s linear infinite;
+}
+
+.animate-scroll-right {
+  animation: scroll-right 5s linear infinite;
+}
+
+ /* styles/globals.css */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+   
