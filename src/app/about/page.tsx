@@ -8,10 +8,10 @@ import EcosystemSection from '../components/EcosystemSection';
 
 export default function About() {
   return (
-    <div className="min-h-screen font-[Lato] bg-black text-white flex flex-col items-center px-4 space-y-10">
+    <div className="overflow-hidden min-h-screen font-[Lato] bg-black text-white flex flex-col items-center px-4 space-y-10 ">
       {/* TCJ Logo + Image */}
       <div className="relative w-full pt-48 max-w-5xl flex flex-col items-center bg-white/5">
-        <div className="text-[320px] font-[Monotype] font-extrabold text-white z-0 absolute -top-0 select-none">
+        <div className="md:text-[320px] text-[240px] font-[Monotype] font-extrabold text-white z-0 absolute -left-0 sm:left-auto -top-0 select-none">
           TCJ
         </div>
 
@@ -31,13 +31,13 @@ export default function About() {
       </div>
 
       {/* Title and Role */}
-      <div className="text-center py-10 font-[Monotype] text-[#E3E3E3] text-2xl italic font-light max-w-lg">
+      <div className="text-center py-10 font-[Monotype] text-[#E3E3E3] md:text-3xl text-2xl italic font-light md:max-w-3xl px-2">
         I’m Chris John, Serial Entrepreneur, Branding Expert, Business
         Developer, AI & Blockchain Consultant.
       </div>
 
       {/* Bio Box */}
-      <div className="bg-[#0D0D0D] text-[#A8A8A8] rounded-xl py-20 max-w-5xl w-full leading-relaxed px-60">
+      <div className="bg-[#0D0D0D] text-[#A8A8A8] rounded-xl md:py-14 py-7 max-w-5xl w-full leading-relaxed md:px-40 px-4">
         <p className="mb-4">
           Chris John is a dynamic creative force from Akwa Ibom, Nigeria. As a serial entrepreneur, he
           leads projects across branding, tech, and education.

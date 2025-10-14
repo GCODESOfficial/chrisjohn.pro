@@ -35,22 +35,22 @@ export default function SpecializationsSection() {
   const row2 = items.slice(3);
 
   return (
-    <section className="bg-black text-white pt-28 px-6 md:px-12">
-      <div className="max-w-5xl mx-auto text-left mb-16">
-        <h2 className="text-3xl md:text-4xl font-semibold">
+    <section className="bg-black text-white pt-28  md:px-12 w-full">
+      <div className="md:max-w-5xl mx-auto text-left mb-16">
+        <h2 className="text-3xl md:text-4xl font-extrabold">
           What I specialize in and
         </h2>
-        <p className="text-5xl font-[Monotype] text-gray-300 mt-2">
+        <p className="md:text-6xl text-5xl font-[Monotype] text-gray-300 mt-2">
           enjoy <span className="text-white">doing most.</span>
         </p>
       </div>
 
       {/* Row 1: 3 columns */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3  max-w-5xl gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3  md:max-w-5xl gap-6 mb-6">
         {row1.map((item, index) => (
           <div
             key={index}
-            className="bg-[#0f0f0f] rounded-2xl p-4 flex flex-col justify-between"
+            className="bg-[#0f0f0f] rounded-2xl px-7 pt-7 flex flex-col justify-between"
           >
             <div className="mb-4">
               <h3 className="text-white font-semibold text-lg mb-1">
@@ -58,13 +58,13 @@ export default function SpecializationsSection() {
               </h3>
               <p className="text-[#626262] text-sm">{item.desc}</p>
             </div>
-            <div className="overflow-hidden rounded-xl mt-4">
+            <div className="overflow-hidden rounded-t-xl mt-4">
               <Image
                 src={item.img}
                 alt={item.title}
                 width={600}
                 height={400}
-                className="w-full h-40 object-cover"
+                className="w-full h-48 object-cover"
               />
             </div>
           </div>
@@ -76,7 +76,7 @@ export default function SpecializationsSection() {
         {row2.map((item, index) => (
           <div
             key={index}
-            className="bg-[#0f0f0f] rounded-2xl p-4 flex flex-col justify-between"
+            className="bg-[#0f0f0f] rounded-2xl p-7 pb-0 flex flex-col justify-between"
           >
             <div className="mb-4">
               <h3 className="text-white font-semibold text-lg mb-1">
@@ -84,13 +84,13 @@ export default function SpecializationsSection() {
               </h3>
               <p className="text-[#626262] text-sm">{item.desc}</p>
             </div>
-            <div className="overflow-hidden rounded-xl mt-4">
+            <div className="overflow-hidden rounded-t-xl mt-4">
               <Image
                 src={item.img}
                 alt={item.title}
                 width={600}
                 height={400}
-                className="w-full h-40 object-cover"
+                className="w-full h-48 object-cover"
               />
             </div>
           </div>

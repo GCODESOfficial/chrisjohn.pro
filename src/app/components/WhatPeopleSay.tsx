@@ -14,15 +14,15 @@ const testimonials = new Array(6).fill({
 const WhatPeopleSay = () => {
   return (
     <div className="bg-black font-[Lato] text-white overflow-hidden">
-      <h2 className="text-center text-3xl md:text-4xl mb-20">
-        What <span className="font-[Monotype]">People</span> are saying
+      <h2 className="text-center text-4xl md:text-5xl mb-20 px-2">
+        What <span className="font-[Monotype] md:text-6xl text-5xl">People </span> are saying
       </h2>
 
-      <div className="space-y-5 max-w-6xl w-6xl mx-auto relative">
+      <div className="space-y-5 md:max-w-6xl md:w-6xl mx-auto relative">
 
         {/* Blush to background */}
-      <div className="absolute top-0 left-0 w-20 h-full z-30 bg-gradient-to-l from-transparent via-black to-black pointer-events-none" />
-      <div className="absolute top-0 right-0 w-20 h-full z-30 bg-gradient-to-r from-transparent via-black to-black pointer-events-none" />
+      <div className="absolute top-0 left-0 md:w-20 w-10 h-full z-30 bg-gradient-to-l from-transparent via-black to-black pointer-events-none" />
+      <div className="absolute top-0 right-0 md:w-20 w-10 h-full z-30 bg-gradient-to-r from-transparent via-black to-black pointer-events-none" />
 
 
         {/* Row 1 - left to right */}

@@ -42,22 +42,22 @@ const tagLines = [
 const WaysHelp = () => {
   return (
     <div className="bg-black text-white py-40 px-6 md:px-12 font-[Lato]">
-      <div className="max-w-5xl mx-auto">
-        <h2 className="text-center text-3xl md:text-4xl mb-16">
-          Ways I Can <span className="font-[Monotype]">Help.</span>
+      <div className="md:max-w-5xl mx-auto">
+        <h2 className="text-center text-4xl md:text-5xl mb-16 font-bold">
+          Ways I Can <span className="font-[Monotype] text-6xl"> Help.</span>
         </h2>
 
-        <div className="grid md:grid-cols-3 gap-8 ">
+        <div className="md:grid md:grid-cols-3 gap-8 ">
           {/* Card 1 - What I Focus On */}
-          <div className="bg-[#0F0F0F] rounded-2xl px-6 pt-6 shadow-lg flex flex-col justify-between">
+          <div className="bg-[#0F0F0F]  rounded-2xl px-6 pt-6 shadow-lg flex flex-col justify-between">
             <div>
-              <h3 className="text-xl font-[Monotype] mb-2">What I Focus On</h3>
+              <h3 className="text-4xl font-[Monotype] mb-2">What I Focus On</h3>
               <p className="text-[#626262] text-sm mb-4">
                 The areas where I bring the most value and impact.
               </p>
             </div>
             <div className="rounded-xl overflow-hidden">
-              <div className="w-[320px] h-[250px] relative bg-[#292929] flex flex-col justify-center overflow-hidden rounded-md space-y-3 p-2">
+              <div className="md:w-[320px] h-[250px] relative bg-[#292929] flex flex-col justify-center overflow-hidden rounded-md space-y-3 p-2">
                 {tagLines.map((tags, idx) => (
                   <div
                     key={idx}
@@ -87,7 +87,7 @@ const WaysHelp = () => {
           {/* Card 2 - Consultation */}
           <div className="bg-[#F0F0F0] text-black rounded-2xl px-6 pt-6 shadow-lg flex flex-col justify-between">
             <div>
-              <h3 className="text-xl font-[Monotype] mb-2">Consultation</h3>
+              <h3 className="text-4xl font-[Monotype] mb-2">Consultation</h3>
               <p className="text-[#060606] text-sm mb-4">
                 Book a Session with Chris John
               </p>
@@ -109,17 +109,17 @@ const WaysHelp = () => {
           {/* Card 3 - My Books */}
           <div className="bg-[#0F0F0F] rounded-2xl px-6 pt-6 shadow-lg flex flex-col justify-between">
             <div>
-              <h3 className="text-xl font-[Monotype] mb-2">My Books</h3>
+              <h3 className="text-4xl font-[Monotype] mb-2">My Books</h3>
               <p className="text-[#626262] text-sm mb-4">
                 Read. Reflect. Reposition.
               </p>
-              <button className="border border-white px-4 py-2 rounded-md text-white text-sm flex items-center gap-2 hover:bg-white hover:text-black hover:font-semibold transition">
+              <button className="text-black bg-[#E3E3E3] hover:bg-white px-4 py-2 rounded-md text-sm flex items-center gap-2 font-semibold transition">
                 Buy Now <span className="text-base">→</span>
               </button>
             </div>
             <div className="mt-6 rounded-xl overflow-hidden">
               <Image
-                src="/images/book.svg"
+                src="/images/book1.svg"
                 alt="Books"
                 width={400}
                 height={300}

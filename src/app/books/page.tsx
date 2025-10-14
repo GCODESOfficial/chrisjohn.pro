@@ -1,120 +1,182 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
-import { useState } from "react";
-import WhatPeopleSay from "../components/WhatPeopleSay";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import WhatPeopleSay from "../components/WhatPeopleSay";
 import BookModal from "../components/BookModal";
 import PurchaseModal from "../components/PurchaseModal";
+import { supabase } from "@/lib/supabase";
+
+/** Match your admin/books schema */
+type BookRow = {
+  id: string;
+  created_at: string;
+  title: string | null;
+  subtitle: string | null;
+  price: string | null;
+  author_name: string | null;
+  x_link: string | null;
+  instagram_link: string | null;
+  about: string | null;
+  cover_url_front: string | null;
+  cover_url_back: string | null;
+};
 
 export default function BooksPage() {
-    const [modal, setModal] = useState<"none" | "book-info" | "book-form">("none");
+  const [books, setBooks] = useState<BookRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [modal, setModal] = useState<"none" | "book-info" | "book-form">("none");
+  const [selected, setSelected] = useState<BookRow | null>(null);                // full book for the info modal
+  const [selectedBook, setSelectedBook] = useState<{ id: string } | null>(null); // id for purchase modal
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("books")
+          .select(
+            "id, created_at, title, subtitle, price, author_name, x_link, instagram_link, about, cover_url_front, cover_url_back"
+          )
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        if (!cancel) setBooks((data || []) as BookRow[]);
+      } catch (e) {
+        console.error(e);
+        if (!cancel) setBooks([]);
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
 
   return (
     <main className="min-h-screen font-[Lato] bg-black text-white">
-         <div className="relative  w-full max-w-5xl mx-auto rounded-2xl overflow-hidden h-[35rem]">
-      {/* Background Image */}
-      <Image
-        src="/images/books-bg.svg"
-        alt="Books"
-        fill
-        className=" h-auto w-full object-cover"
-      />
-
-      {/* Overlay */}
-      <div className="absolute inset-0 bg-black/60" />
-
-      {/* Centered Text */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 px-4">
-        <h2 className="text-3xl md:text-5xl ">Books Authored</h2>
-        <p className="text-xl md:text-4xl font-[Monotype] mt-2">by Chris John</p>
-      </div>
-    </div>
-
-    <div className="max-w-5xl mx-auto mt-28 relative rounded-2xl flex flex-col md:flex-row items-center gap-8 p-6 md:p-10 text-white  overflow-visible">
-      {/* Book Container */}
-      <div className="relative w-[220px] shrink-0">
-        {/* Back (Blurred Shadow Book) */}
+      {/* Hero */}
+      <div className="relative w-full max-w-5xl mx-auto rounded-2xl overflow-hidden h-[35rem]">
         <Image
-          src="/images/manifest-book.svg"
-          alt="Shadow Book"
-          width={280}
-          height={360}
-          className="absolute top-10 -left-10 opacity-10  drop-shadow-2xl z-0"
+          src="/images/books-bg.svg"
+          alt="Books"
+          fill
+          className="h-auto w-full object-cover"
+          priority
         />
-
-        {/* Front (Main Book) */}
-        <Image
-          src="/images/manifest-book.svg"
-          alt="Manifest Book"
-          width={280}
-          height={360}
-          className="relative z-20 object-contain"
-        />
-      </div>
-
-      {/* Text Content */}
-      <div className="flex-1 z-10 bg-[#0f0f0f] py-5 absolute w-4xl max-w-4xl rounded-2xl left-36 top-20 pl-80 pr-32">
-        <h4 className="text-sm text-white font-semibold uppercase tracking-wide mb-2">
-          Manifest
-        </h4>
-        <h2 className="text-2xl md:text-3xl font-[Monotype] font-light mb-4">
-          7 Steps To Living <br className="hidden sm:block" />
-          Your Best Life
-        </h2>
-        <p className="text-[#A8A8A8] text-sm leading-relaxed mb-6">
-          Chris John introduces Manifest, a deeply personal guide designed to support
-          readers to heal their relationship with money and align their financial
-          goals with a greater purpose.
-        </p>
-
-        <button  onClick={() => setModal("book-info")} className="bg-white text-black text-sm px-5 py-2 rounded-md flex items-center gap-2 hover:bg-gray-100 transition">
-          Buy Now <span>→</span>
-        </button>
-      </div>
-    </div>
-
-    <section className="bg-black text-white pt-36 text-center">
-      <h2 className="text-4xl font-semibold">
-        Real Story, <span className="font-[Monotype] text-5xl font-normal">Real Impact</span>
-      </h2>
-
-      <div className="mt-10 text-2xl font-[Monotype] leading-relaxed max-w-4xl mx-auto">
-        <p className="text-4xl mb-4">“</p>
-        <p>
-          Manifest is the most insightful book i have read. <br />
-          Chris has really made a change by writting this book.
-        </p>
-
-        <div className="mt-8 flex justify-center items-center gap-3">
-          <Image
-            src="/images/Avatar.svg"
-            alt="Styles Jason"
-            width={32}
-            height={32}
-            className="rounded-full"
-          />
-          <div className="text-left font-[Lato] text-sm">
-            <p className="font-medium">Styles Jason</p>
-            <p className="text-[#A8A8A8]">Canada</p>
-          </div>
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white z-10 px-4">
+          <h2 className="text-3xl md:text-5xl">Books Authored</h2>
+          {books.length > 0 &&
+            books.every((b) => b.author_name === books[0].author_name) &&
+            books[0].author_name && (
+              <p className="text-xl md:text-4xl font-[Monotype] mt-2">by {books[0].author_name}</p>
+            )}
         </div>
       </div>
 
+      {/* Books list */}
+      <div className="max-w-5xl mx-auto mt-20 space-y-24 px-6 md:px-10">
+        {loading && (
+          <div className="space-y-10">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="h-72 rounded-2xl bg-white/5 animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {!loading &&
+          books.map((book) => (
+            <div
+              key={book.id}
+              className="relative rounded-2xl flex md:flex-row flex-col items-start gap-8 py-10 md:py-16 overflow-visible md:min-h-[320px]"
+            >
+              {/* Book visuals (left) */}
+              <div className="relative w-[220px] shrink-0 mx-auto md:mx-0">
+                {book.cover_url_back && (
+                  <img
+                    src={book.cover_url_back}
+                    alt={`${book.title || "Book"} back`}
+                    width={280}
+                    height={360}
+                    className="absolute top-14 -left-10 opacity-10 drop-shadow-2xl z-0"
+                    loading="lazy"
+                  />
+                )}
+                {book.cover_url_front && (
+                  <img
+                    src={book.cover_url_front}
+                    alt={book.title || "Book"}
+                    width={280}
+                    height={360}
+                    className="relative z-20 object-contain"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+
+              {/* Info panel (right) */}
+              <div
+                className="
+                  z-10 bg-[#0f0f0f] rounded-2xl md:w-[52rem] w-full -mt-12 md:-mt-0 h-72
+                  p-8
+                  relative md:absolute md:left-36 md:top-24 md:pl-48 md:pr-32
+                "
+              >
+                {book.title && (
+                  <h4 className="md:text-sm text-white font-semibold uppercase tracking-wide mb-2">
+                    {book.title}
+                  </h4>
+                )}
+                {book.subtitle && (
+                  <h2 className="text-3xl md:text-3xl font-[Monotype] font-light mb-4 whitespace-pre-line">
+                    {book.subtitle}
+                  </h2>
+                )}
+                {book.about && (
+                  <p className="text-[#A8A8A8] md:text-sm leading-relaxed mb-6">{book.about}</p>
+                )}
+
+                <button
+                  onClick={() => {
+                    setSelected(book);        // pass full data into BookModal
+                    setModal("book-info");
+                  }}
+                  className="bg-white text-black md:text-sm px-5 py-2 rounded-md flex items-center gap-2 hover:bg-gray-100 transition"
+                >
+                  {book.price ? `Buy Now — ${book.price}` : "Buy Now"} <span>→</span>
+                </button>
+              </div>
+            </div>
+          ))}
+      </div>
+
       {/* Modals */}
-      {modal === "book-info" && (
+      {modal === "book-info" && selected && (
         <BookModal
+          initial={selected}            // dynamic content
           onClose={() => setModal("none")}
-          onProceed={() => setModal("book-form")}
+          onProceed={() => {
+            if (selected) setSelectedBook({ id: selected.id }); // set the id for the purchase modal
+            setModal("book-form");
+          }}
         />
       )}
-      {modal === "book-form" && <PurchaseModal onClose={() => setModal("none")} />}
-  
-    </section>
 
+      {modal === "book-form" && selectedBook && (
+        <PurchaseModal
+          bookId={selectedBook.id}      // PurchaseModal already accepts this
+          onClose={() => setModal("none")}
+        />
+      )}
 
-      <div className="py-32">
-   <WhatPeopleSay />
-      </div>
-   
+      {/* Testimonials */}
+      <section className="py-32">
+        <WhatPeopleSay />
+      </section>
     </main>
   );
 }
