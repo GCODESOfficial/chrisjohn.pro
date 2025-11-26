@@ -1,10 +1,12 @@
 // app/events/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import EventModal from "../components/EventModal";
 import RegisterModal from "../components/RegisterModal";
+import { parseEventDate, formatEventForDisplay } from "@/lib/dateUtils";
 
 type EventRow = {
   id: string;
@@ -21,38 +23,7 @@ type EventRow = {
   hosting_url: string | null; // ← NEW
 };
 
-const MONTHS: Record<string, number> = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
-const stripWeekdayPrefix = (s: string) => s.replace(/^\s*[A-Za-z]{3,9},\s*/g, "");
-const ensureYear = (s: string) => (/\d{4}/.test(s) ? s : `${s}, ${new Date().getFullYear()}`);
-const cleanTime = (t: string) => t.replace(/GMT\s*\+?1/gi, "").trim();
-
-function manualParse(dateStr: string, timeStr: string) {
-  const m = dateStr.match(/^\s*([A-Za-z]{3,})\s+(\d{1,2})(?:,)?\s+(\d{4})\s*$/);
-  if (!m) return null;
-  const mon = MONTHS[m[1].slice(0, 3).toLowerCase()];
-  const day = Number(m[2]); const year = Number(m[3]);
-  const tm = timeStr.match(/^\s*(\d{1,2}):?(\d{2})?\s*(AM|PM)?\s*$/i);
-  if (!tm) return null;
-  let hour = Number(tm[1]); const minute = tm[2] ? Number(tm[2]) : 0;
-  const ampm = tm[3]?.toUpperCase();
-  if (ampm) { if (ampm==="PM" && hour<12) hour+=12; if (ampm==="AM" && hour===12) hour=0; }
-  const pad = (n: number) => String(n).padStart(2,"0");
-  const iso = `${year}-${pad(mon+1)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00+01:00`;
-  const d = new Date(iso); return isNaN(d.getTime()) ? null : d;
-}
-function parseLagosDate(event_date?: string | null, event_time?: string | null): Date | null {
-  if (!event_date || !event_time) return null;
-  const ds = ensureYear(stripWeekdayPrefix(event_date));
-  const ts = cleanTime(event_time);
-  const c1 = new Date(`${ds} ${ts} +01:00`); if (!isNaN(c1.getTime())) return c1;
-  const c2 = new Date(`${ds} ${ts}`); if (!isNaN(c2.getTime())) return manualParse(ds, ts) ?? c2;
-  return manualParse(ds, ts);
-}
-function formatForDisplay(d: Date) {
-  const date = d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
-  const time = d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
-  return { date, time: `${time} GMT +1` };
-}
+// Date parsing and formatting now handled by dateUtils
 function inferType(hosting_url?: string | null, x?: string | null, ig?: string | null) {
   const has = (s?: string | null) => !!s && s.trim().length > 8 && s.trim() !== "https://";
   return has(hosting_url) || has(x) || has(ig) ? "Live stream" : "In-person";
@@ -62,7 +33,21 @@ const isStartingSoon = (startsAt: Date, now: Date) => {
   return diff > 0 && diff <= 60 * 60 * 1000;
 };
 
-export default function EventsPage() {
+// Convert event name to URL-friendly slug
+function createEventSlug(topic: string | null, id: string): string {
+  if (!topic) return id;
+  return topic
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-')      // Replace spaces with hyphens
+    .replace(/-+/g, '-')      // Replace multiple hyphens with single
+    .replace(/^-|-$/g, '');   // Remove leading/trailing hyphens
+}
+
+function EventsPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [openModal, setOpenModal] = useState(false);
@@ -76,9 +61,10 @@ export default function EventsPage() {
         setLoading(true);
         const { data, error } = await supabase.from("events").select("*");
         if (error) throw error;
+        console.log("📅 Fetched events:", data);
         if (mounted) setEvents((data ?? []) as EventRow[]);
       } catch (e) {
-        console.error(e);
+        console.error("❌ Error fetching events:", e);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -87,16 +73,51 @@ export default function EventsPage() {
   }, []);
 
   const now = useMemo(() => new Date(), []);
-  const enriched = useMemo(() => events.map((e) => ({ raw: e, startsAt: parseLagosDate(e.event_date ?? "", e.event_time ?? "") })).filter((x) => !!x.startsAt) as {raw: EventRow; startsAt: Date}[], [events]);
+  const enriched = useMemo(() => {
+    const mapped = events.map((e) => {
+      const startsAt = parseEventDate(e.event_date ?? "", e.event_time ?? "");
+      if (!startsAt) {
+        console.warn(`⚠️ Failed to parse date for event "${e.topic}":`, {
+          event_date: e.event_date,
+          event_time: e.event_time,
+        });
+      }
+      return { raw: e, startsAt };
+    });
+    const filtered = mapped.filter((x): x is {raw: EventRow; startsAt: Date} => !!x.startsAt);
+    return filtered;
+  }, [events]);
   const upcoming = useMemo(() => enriched.filter(x => x.startsAt.getTime() >= now.getTime()).sort((a,b)=>a.startsAt.getTime()-b.startsAt.getTime()), [enriched, now]);
   const past = useMemo(() => enriched.filter(x => x.startsAt.getTime() < now.getTime()).sort((a,b)=>b.startsAt.getTime()-a.startsAt.getTime()), [enriched, now]);
 
   const openFor = (e: EventRow) => { setSelected(e); setOpenModal(true); };
 
+  // Check URL for event slug and open modal if found
+  useEffect(() => {
+    if (typeof window === 'undefined' || events.length === 0) return;
+    
+    const eventSlug = searchParams?.get('event');
+    
+    if (eventSlug && !openModal) {
+      const event = events.find(e => {
+        const slug = createEventSlug(e.topic, e.id);
+        return slug === eventSlug || e.id === eventSlug;
+      });
+      if (event) {
+        setSelected(event);
+        setOpenModal(true);
+        // Clean up URL to just /events (remove query param after opening)
+        const url = new URL(window.location.href);
+        url.searchParams.delete('event');
+        router.replace(url.pathname);
+      }
+    }
+  }, [searchParams, events, openModal, router]);
+
   return (
     <main className="min-h-screen bg-black text-white">
-      <section className="bg-black text-white px-6 py-12 max-w-5xl mx-auto md:w-5xl pt-40 font-[Lato]">
-        <h2 className="text-3xl font-semibold">Upcoming <span className="font-[Monotype] text-4xl font-normal">Events</span></h2>
+      <section className="bg-black text-white px-6 py-12 max-w-5xl mx-auto md:w-5xl pt-40 font-[Syne]">
+        <h2 className="text-3xl font-semibold">Upcoming <span className="font-[Syne] text-4xl font-normal">Events</span></h2>
 
         {loading ? (
           <div className="mt-6 space-y-8">
@@ -108,7 +129,7 @@ export default function EventsPage() {
         ) : (
           <div className="mt-6 space-y-10">
             {upcoming.map(({ raw, startsAt }) => {
-              const { date, time } = formatForDisplay(startsAt);
+              const { date, time } = formatEventForDisplay(startsAt);
               const isVideo = raw.cover_url ? /\.(mp4|mov|webm|ogg)$/i.test(raw.cover_url) : false;
               return (
                 <div key={raw.id} className="flex flex-col sm:flex-row sm:items-center gap-8">
@@ -169,8 +190,8 @@ export default function EventsPage() {
         <div className="mt-6 border-t border-zinc-700" />
       </section>
 
-      <section className="bg-black text-white px-6 py-20 pb-40 md:w-5xl max-w-5xl mx-auto font-[Lato]">
-        <h2 className="text-3xl font-semibold">Explore past <span className="font-[Monotype] text-5xl font-normal">events</span></h2>
+      <section className="bg-black text-white px-6 py-20 pb-40 md:w-5xl max-w-5xl mx-auto font-[Syne]">
+        <h2 className="text-3xl font-semibold">Explore past <span className="font-[Syne] text-5xl font-normal">events</span></h2>
         <p className="text-[#A8A8A8] text-base mt-1">Revisit highlights, moments, and memories from our previous experiences.</p>
 
         {loading ? (
@@ -183,7 +204,7 @@ export default function EventsPage() {
         ) : (
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-6">
             {past.map(({ raw, startsAt }) => {
-              const { date, time } = formatForDisplay(startsAt);
+              const { date, time } = formatEventForDisplay(startsAt);
               const isVideo = raw.cover_url ? /\.(mp4|mov|webm|ogg)$/i.test(raw.cover_url) : false;
               return (
                 <div className="flex gap-4 cursor-pointer" key={raw.id} onClick={()=>openFor(raw)}>
@@ -213,5 +234,22 @@ export default function EventsPage() {
         )}
       </section>
     </main>
+  );
+}
+
+export default function EventsPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-black text-white">
+        <section className="bg-black text-white px-6 py-12 max-w-5xl mx-auto md:w-5xl pt-40 font-[Syne]">
+          <div className="mt-6 space-y-8">
+            <div className="h-60 rounded-xl bg-neutral-900 animate-pulse" />
+            <div className="h-60 rounded-xl bg-neutral-900 animate-pulse" />
+          </div>
+        </section>
+      </main>
+    }>
+      <EventsPageContent />
+    </Suspense>
   );
 }

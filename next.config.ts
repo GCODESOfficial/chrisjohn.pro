@@ -16,4 +16,5 @@ module.exports = {
       { protocol: "https", hostname: "video.twimg.com" }, // video previews
     ],
   },
+  serverExternalPackages: ['pdf-parse'],
 };

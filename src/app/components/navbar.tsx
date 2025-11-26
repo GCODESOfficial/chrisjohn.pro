@@ -7,6 +7,7 @@ import clsx from "clsx";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import Footer from "./footer";
+import { parseEventDate, formatEventForDisplay } from "@/lib/dateUtils";
 
 /* ---------- Types for events ---------- */
 type EventRow = {
@@ -21,39 +22,7 @@ type EventRow = {
   instagram_link?: string | null;
 };
 
-/* ---------- Date parsing (Lagos, +01:00) ---------- */
-const MONTHS: Record<string, number> = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
-const stripWeekdayPrefix = (s: string) => s.replace(/^\s*[A-Za-z]{3,9},\s*/g, "");
-const ensureYear = (s: string) => (/\d{4}/.test(s) ? s : `${s}, ${new Date().getFullYear()}`);
-const cleanTime = (t: string) => t.replace(/GMT\s*\+?1/gi, "").trim();
-
-function manualParse(dateStr: string, timeStr: string) {
-  const m = dateStr.match(/^\s*([A-Za-z]{3,})\s+(\d{1,2})(?:,)?\s+(\d{4})\s*$/);
-  if (!m) return null;
-  const mon = MONTHS[m[1].slice(0, 3).toLowerCase()];
-  const day = Number(m[2]); const year = Number(m[3]);
-  const tm = timeStr.match(/^\s*(\d{1,2}):?(\d{2})?\s*(AM|PM)?\s*$/i);
-  if (!tm) return null;
-  let hour = Number(tm[1]); const minute = tm[2] ? Number(tm[2]) : 0;
-  const ampm = tm[3]?.toUpperCase();
-  if (ampm) { if (ampm==="PM" && hour<12) hour+=12; if (ampm==="AM" && hour===12) hour=0; }
-  const pad = (n: number) => String(n).padStart(2,"0");
-  const iso = `${year}-${pad(mon+1)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00+01:00`;
-  const d = new Date(iso); return isNaN(d.getTime()) ? null : d;
-}
-function parseLagosDate(event_date?: string | null, event_time?: string | null): Date | null {
-  if (!event_date || !event_time) return null;
-  const ds = ensureYear(stripWeekdayPrefix(event_date));
-  const ts = cleanTime(event_time);
-  const c1 = new Date(`${ds} ${ts} +01:00`); if (!isNaN(c1.getTime())) return c1;
-  const c2 = new Date(`${ds} ${ts}`); if (!isNaN(c2.getTime())) return manualParse(ds, ts) ?? c2;
-  return manualParse(ds, ts);
-}
-function formatForDisplay(d: Date) {
-  const date = d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
-  const time = d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true});
-  return { date, time: `${time} GMT +1` };
-}
+// Date parsing and formatting now handled by dateUtils
 const within = (ms: number, min: number, max: number) => ms >= min && ms <= max;
 const hasUrl = (s?: string | null) => !!s && s.trim().length > 8 && s.trim() !== "https://";
 
@@ -121,7 +90,7 @@ export default function Navbar() {
         const events = (data ?? []) as EventRow[];
 
         const enriched = events
-          .map(e => ({ raw: e, startsAt: parseLagosDate(e.event_date ?? "", e.event_time ?? "") }))
+          .map(e => ({ raw: e, startsAt: parseEventDate(e.event_date ?? "", e.event_time ?? "") }))
           .filter((x): x is {raw: EventRow; startsAt: Date} => !!x.startsAt)
           .sort((a,b)=>a.startsAt.getTime()-b.startsAt.getTime());
 
@@ -139,7 +108,7 @@ export default function Navbar() {
         if (isLiveOrStartingSoon) {
           if (mounted) setBanner({ kind: "live", title: next.raw.topic ?? "Live event", href });
         } else {
-          const { date } = formatForDisplay(next.startsAt);
+          const { date } = formatEventForDisplay(next.startsAt);
           if (mounted) setBanner({ kind: "upcoming", title: next.raw.topic ?? "Upcoming event", date, href });
         }
       } catch {
@@ -155,7 +124,7 @@ export default function Navbar() {
   return (
     <>
       {/* ===== Static Announcement Banner (shell never unmounts) ===== */}
-      <div className="fixed font-[Lato] top-0 inset-x-0 z-[40] bg-[#0D0D0D]">
+      <div className="fixed font-[Montserrat] top-0 inset-x-0 z-[40] bg-[#0D0D0D]">
         <div className="mx-auto px-6 md:px-32 h-9 md:h-11 flex items-center justify-center text-[13px] text-zinc-300 gap-4">
           {/* Left group */}
           <div className="flex items-center gap-2 min-w-0">
@@ -188,10 +157,10 @@ export default function Navbar() {
               </a>
             )}
             {banner.kind === "soon" && (
-              <a href="/events"
+              <Link href="/events"
                  className="inline-flex items-center gap-1 text-[13px] font-semibold text-zinc-100 hover:opacity-90">
                 <h1 className="underline">Explore Events</h1> <span aria-hidden>→</span>
-              </a>
+              </Link>
             )}
           </div>
         </div>
@@ -200,7 +169,7 @@ export default function Navbar() {
       {/* ===== Navbar ===== */}
       <nav
         className={clsx(
-          "w-full font-[Lato] fixed bg-[#000000] text-white px-6 md:px-32 py-4 flex justify-between items-center z-50 transition-[top]",
+          "w-full font-[Syne] fixed bg-[#000000] text-white px-6 md:px-32 py-4 flex justify-between items-center z-50 transition-[top]",
           navTopClass
         )}
       >
@@ -229,12 +198,12 @@ export default function Navbar() {
         </div>
 
         <a
-          href="https://t.me/cdslabsxyz"
+          href="https://t.me/thechrisjohn"
           target="_blank"
           rel="noopener noreferrer"
           className="hidden ml-4 px-4 py-1.5 bg-white text-black rounded md:flex items-center gap-2 text-sm font-semibold"
         >
-          Let’s Talk
+          Let&apos;s Talk
         </a>
 
         {/* Mobile Menu Button */}
@@ -288,12 +257,12 @@ export default function Navbar() {
 
               {/* CTA Button */}
               <a
-                href="https://t.me/cdslabsxyz"
+                href="https://t.me/thechrisjohn"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-6 mx-6 px-4 py-2 bg-white text-black rounded flex items-center gap-2 w-fit text-sm font-semibold"
               >
-                Let’s Talk
+                Let&apos;s Talk
               </a>
 
               {/* Footer pinned to bottom */}
