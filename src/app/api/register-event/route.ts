@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { parseEventDate } from "@/lib/dateUtils";
 
 // dynamic imports (small serverless bundle)
 const pdfLibPromise = () => import("pdf-lib");
@@ -38,24 +39,47 @@ function signToken(payload: any) {
 }
 
 async function verifyPaystack(reference: string) {
-  if (!PAYSTACK_SECRET_KEY) return { ok: false, payload: { error: "PAYSTACK_SECRET_KEY is missing" } };
-  const res = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-    headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-  if (!res.ok) return { ok: false, payload: await res.json().catch(() => ({})) };
-  const payload = await res.json();
-  return payload?.data?.status === "success" ? { ok: true, payload } : { ok: false, payload };
+  if (!PAYSTACK_SECRET_KEY) {
+    console.error("[verifyPaystack] PAYSTACK_SECRET_KEY is missing");
+    return { ok: false, payload: { error: "PAYSTACK_SECRET_KEY is missing" } };
+  }
+  
+  try {
+    const res = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
+      cache: "no-store",
+    });
+    
+    if (!res.ok) {
+      const errorPayload = await res.json().catch(() => ({}));
+      console.error("[verifyPaystack] HTTP error:", res.status, errorPayload);
+      return { ok: false, payload: errorPayload };
+    }
+    
+    const payload = await res.json();
+    console.log("[verifyPaystack] Response:", JSON.stringify(payload, null, 2));
+    
+    // Paystack response structure:
+    // { status: true, message: "...", data: { status: "success", ... } }
+    // Check both API call success and transaction status
+    const apiSuccess = payload?.status === true;
+    const transactionStatus = payload?.data?.status;
+    const isSuccess = apiSuccess && (transactionStatus === "success" || transactionStatus === "Success");
+    
+    if (isSuccess) {
+      console.log("[verifyPaystack] Payment verified successfully");
+      return { ok: true, payload };
+    } else {
+      console.error("[verifyPaystack] Payment verification failed - API success:", apiSuccess, "Transaction status:", transactionStatus);
+      return { ok: false, payload };
+    }
+  } catch (error: any) {
+    console.error("[verifyPaystack] Exception:", error?.message || error);
+    return { ok: false, payload: { error: error?.message || "Verification failed" } };
+  }
 }
 
-function parseLagosDate(dateStr?: string | null, timeStr?: string | null): Date | null {
-  if (!dateStr || !timeStr) return null;
-  const ds = dateStr.replace(/^\s*[A-Za-z]{3,9},\s*/g, "");
-  const withYear = /\d{4}/.test(ds) ? ds : `${ds}, ${new Date().getFullYear()}`;
-  const ts = (timeStr || "").replace(/GMT\s*\+?1/gi, "").trim();
-  const d = new Date(`${withYear} ${ts} +01:00`);
-  return isNaN(d.getTime()) ? null : d;
-}
+// Date parsing now handled by dateUtils
 function toICSDate(dt: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth() + 1)}${pad(dt.getUTCDate())}T${pad(
@@ -134,17 +158,38 @@ async function makeTicketPDF(args: {
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg  = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
+  // Helper to sanitize text for PDF encoding (remove unsupported characters like ₦)
+  const sanitizeForPDF = (text: string): string => {
+    if (!text) return text;
+    // Map common currency symbols to ASCII equivalents
+    const currencyMap: Record<string, string> = {
+      '₦': 'NGN',
+      '€': 'EUR',
+      '£': 'GBP',
+      '¥': 'JPY',
+      '₹': 'INR',
+    };
+    // Replace currency symbols first, then handle other non-ASCII characters
+    let sanitized = text;
+    for (const [symbol, replacement] of Object.entries(currencyMap)) {
+      sanitized = sanitized.replace(new RegExp(symbol, 'g'), replacement);
+    }
+    // Remove any remaining non-ASCII characters that might cause encoding issues
+    return sanitized.replace(/[^\x00-\x7F]/g, '');
+  };
+
   // Helpers
   const hr = (y: number) =>
     page.drawRectangle({ x: padX, y, width: width - padX * 2, height: 0.6, color: light });
 
   const labelVal = (x: number, y: number, label: string, value: string) => {
-    page.drawText(label.toUpperCase(), { x, y, size: 8, font: fontBold, color: mid });
-    page.drawText(value, { x, y: y - 12, size: 10, font: fontReg, color: textDark });
+    page.drawText(sanitizeForPDF(label.toUpperCase()), { x, y, size: 8, font: fontBold, color: mid });
+    page.drawText(sanitizeForPDF(value), { x, y: y - 12, size: 10, font: fontReg, color: textDark });
   };
 
   const wrap = (text: string, font: any, size: number, maxWidth: number) => {
-    const words = (text || "").split(/\s+/);
+    const sanitized = sanitizeForPDF(text || "");
+    const words = sanitized.split(/\s+/);
     const lines: string[] = [];
     let line = "";
     for (const w of words) {
@@ -177,8 +222,9 @@ async function makeTicketPDF(args: {
   };
 
   const centerSingle = (y: number, text: string, size: number, font = fontBold, color = white) => {
-    const w = font.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: (width - w) / 2, y, size, font, color });
+    const sanitized = sanitizeForPDF(text);
+    const w = font.widthOfTextAtSize(sanitized, size);
+    page.drawText(sanitized, { x: (width - w) / 2, y, size, font, color });
   };
 
   // Header band
@@ -200,7 +246,7 @@ async function makeTicketPDF(args: {
   // Event title — wrapped & centered with x padding
   let y = drawCenteredWrapped(
     qrY - 42,
-    (args.event.title || "Event").toUpperCase(),
+    sanitizeForPDF((args.event.title || "Event").toUpperCase()),
     14,
     fontBold,
     textDark,
@@ -209,13 +255,13 @@ async function makeTicketPDF(args: {
   );
 
   // Attendee lines — also wrapped to respect padding (typically one line)
-  y = drawCenteredWrapped(y - 6, `NAME: ${args.attendee.name}`, 10, fontReg, mid, width - padX * 2, 2);
-  y = drawCenteredWrapped(y - 4, `E-MAIL: ${args.attendee.email}`, 9, fontReg, mid, width - padX * 2, 2);
+  y = drawCenteredWrapped(y - 6, sanitizeForPDF(`NAME: ${args.attendee.name}`), 10, fontReg, mid, width - padX * 2, 2);
+  y = drawCenteredWrapped(y - 4, sanitizeForPDF(`E-MAIL: ${args.attendee.email}`), 9, fontReg, mid, width - padX * 2, 2);
 
   // Divider + place
   hr(y - 10);
   y -= 26;
-  y = drawCenteredWrapped(y, `PLACE: ${args.event.placeLabel}`, 9, fontBold, textDark, width - padX * 2, 2);
+  y = drawCenteredWrapped(y, sanitizeForPDF(`PLACE: ${args.event.placeLabel}`), 9, fontBold, textDark, width - padX * 2, 2);
 
   // Details (two columns)
   const colLeftX = padX;
@@ -235,7 +281,7 @@ async function makeTicketPDF(args: {
   // Note paragraph (constrained by padding)
   const note =
     "Keep this ticket safe. Present the QR code at entry or open the link to check in.";
-  page.drawText(note, {
+  page.drawText(sanitizeForPDF(note), {
     x: padX,
     y: rowTop - 112,
     size: 8.5,
@@ -249,8 +295,8 @@ async function makeTicketPDF(args: {
   page.drawRectangle({ x: 0, y: 0, width, height: footerH, color: band });
 
 // text baselines are lifted by `footerPad` from the very bottom of the page
-centerSingle(footerPad + 16, "Powered by yourticketcompany", 9, fontReg, white);
-centerSingle(footerPad + 4,  `ETKT ${args.ticketId.toUpperCase()}`, 8, fontReg, light);
+centerSingle(footerPad + 16, "Powered by tickT", 9, fontReg, white);
+centerSingle(footerPad + 4,  `${args.ticketId.toUpperCase()}`, 8, fontReg, light);
 
   const bytes = await pdfDoc.save();
   return Buffer.from(bytes);
@@ -286,12 +332,16 @@ export async function POST(req: Request) {
 
     // Verify Paystack unless free
     if (!free) {
+      console.log("[register-event] Verifying payment for reference:", reference);
       const verified = await verifyPaystack(reference);
-      if (!verified.ok)
+      if (!verified.ok) {
+        console.error("[register-event] Payment verification failed:", verified.payload);
         return NextResponse.json(
           { ok: false, error: "Unable to verify payment with Paystack.", details: verified.payload },
           { status: 400 }
         );
+      }
+      console.log("[register-event] Payment verified successfully");
     }
 
     // Load event
@@ -302,7 +352,7 @@ export async function POST(req: Request) {
       .single();
     if (evErr || !ev) return NextResponse.json({ ok: false, error: "Event not found." }, { status: 404 });
 
-    const startsAt = parseLagosDate(ev.event_date, ev.event_time) || new Date();
+    const startsAt = parseEventDate(ev.event_date, ev.event_time) || new Date();
     const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60 * 1000);
     const dateText = startsAt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
     const timeText =
@@ -371,55 +421,80 @@ const pdf = await makeTicketPDF({
 
     let mailed = false;
     if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
-      const nodemailer = (await import("nodemailer")).default;
-      const transporter = nodemailer.createTransport({
-        host: SMTP_HOST,
-        port: SMTP_PORT,
-        secure: SMTP_SECURE,
-        auth: { user: SMTP_USER, pass: SMTP_PASS },
-      });
+      try {
+        console.log("[register-event] Sending email to:", attendee_email);
+        const nodemailer = (await import("nodemailer")).default;
+        const transporter = nodemailer.createTransport({
+          host: SMTP_HOST,
+          port: SMTP_PORT,
+          secure: SMTP_SECURE,
+          auth: { user: SMTP_USER, pass: SMTP_PASS },
+          connectionTimeout: 10000, // 10 seconds
+          greetingTimeout: 10000,
+          socketTimeout: 10000,
+          // Serverless-friendly configuration - removed blocking verify()
+          // The actual sendMail() will establish connection when needed
+        });
 
-      const isOnline = eventType(ev.hosting_url) === "online";
-      const lines: string[] = [];
-      lines.push(
-        `Hi ${attendee_name},`,
-        "",
-        `Your registration for "${ev.topic || "Event"}" is confirmed.`,
-        `Date: ${dateText} • Time: ${timeText}`
-      );
-      if (isOnline && ev.hosting_url) {
-        lines.push("", `Join link: ${ev.hosting_url}`);
-      } else {
-        lines.push("", "This is an in-person event. Please bring the attached ticket for check-in.");
+        const isOnline = eventType(ev.hosting_url) === "online";
+        const lines: string[] = [];
+        lines.push(
+          `Hi ${attendee_name},`,
+          "",
+          `Your registration for "${ev.topic || "Event"}" is confirmed.`,
+          `Date: ${dateText} • Time: ${timeText}`
+        );
+        if (isOnline && ev.hosting_url) {
+          lines.push("", `Join link: ${ev.hosting_url}`);
+        } else {
+          lines.push("", "This is an in-person event. Please bring the attached ticket for check-in.");
+        }
+        lines.push(
+          "",
+          `Verification URL (QR on ticket): ${tokenUrl}`,
+          "",
+          "We've attached your ticket (PDF) and a calendar invite (.ics). See you there!"
+        );
+
+        const mailResult = await transporter.sendMail({
+          from: EMAIL_FROM,
+          to: attendee_email,
+          bcc: ADMIN_EMAIL || undefined,
+          subject: `Your Ticket — ${ev.topic || "Event"}`,
+          text: lines.join("\n"),
+          attachments: [
+            {
+              filename: `Ticket-${(ev.topic || "Event").replace(/\s+/g, "-")}.pdf`,
+              content: pdf, // Buffer
+              contentType: "application/pdf",
+            },
+            {
+              filename: `Event-${(ev.topic || "Event").replace(/\s+/g, "-")}.ics`,
+              content: ics, // string
+              contentType: "text/calendar; charset=utf-8",
+            },
+          ],
+        });
+
+        console.log("[register-event] Email sent successfully:", mailResult.messageId);
+        mailed = true;
+      } catch (emailError: any) {
+        console.error("[register-event] Email sending failed:", emailError?.message || emailError);
+        console.error("[register-event] Email error details:", {
+          code: emailError?.code,
+          command: emailError?.command,
+          response: emailError?.response,
+          responseCode: emailError?.responseCode,
+          errno: emailError?.errno,
+          syscall: emailError?.syscall,
+          hostname: emailError?.hostname,
+          stack: emailError?.stack,
+        });
+        // Don't fail the entire request if email fails - registration is already saved
+        mailed = false;
       }
-      lines.push(
-        "",
-        `Verification URL (QR on ticket): ${tokenUrl}`,
-        "",
-        "We’ve attached your ticket (PDF) and a calendar invite (.ics). See you there!"
-      );
-
-      await transporter.sendMail({
-        from: EMAIL_FROM,
-        to: attendee_email,
-        bcc: ADMIN_EMAIL || undefined,
-        subject: `Your Ticket — ${ev.topic || "Event"}`,
-        text: lines.join("\n"),
-        attachments: [
-          {
-            filename: `Ticket-${(ev.topic || "Event").replace(/\s+/g, "-")}.pdf`,
-            content: pdf, // Buffer
-            contentType: "application/pdf",
-          },
-          {
-            filename: `Event-${(ev.topic || "Event").replace(/\s+/g, "-")}.ics`,
-            content: ics, // string
-            contentType: "text/calendar; charset=utf-8",
-          },
-        ],
-      });
-
-      mailed = true;
+    } else {
+      console.warn("[register-event] SMTP credentials not configured, skipping email");
     }
 
     return NextResponse.json({ ok: true, mailed, ticketId });

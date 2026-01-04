@@ -128,6 +128,7 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const {
+      free,       // flag for free books
       reference,
       bookId,
       bookTitle,
@@ -148,7 +149,7 @@ export async function POST(req: Request) {
       address,
       notes,
 
-      // optional from client; we’ll also fetch from DB if missing
+      // optional from client; we'll also fetch from DB if missing
       pdfUrl,
       audioUrl,
     } = body || {};
@@ -164,30 +165,39 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1) Verify payment with Paystack
-    const verified = await verifyPaystack(reference);
-    if (!verified.ok) {
-      return NextResponse.json(
-        { ok: false, error: "Unable to verify payment with Paystack.", details: verified.payload },
-        { status: 400 }
-      );
+    // 1) Verify payment with Paystack (skip if free)
+    if (!free) {
+      const verified = await verifyPaystack(reference);
+      if (!verified.ok) {
+        return NextResponse.json(
+          { ok: false, error: "Unable to verify payment with Paystack.", details: verified.payload },
+          { status: 400 }
+        );
+      }
     }
 
-    // 2) If digital URLs weren’t provided, fetch them by bookId
+    // 2) If digital URLs weren't provided, fetch them by bookId
     let pdf = pdfUrl;
     let audio = audioUrl;
 
-    if ((format === "PDF" || format === "Audio") && (!pdf || !audio)) {
-      const { data: bookRow, error: bookErr } = await supabaseAdmin
-        .from("books")
-        .select("title, pdf_url, audio_url")
-        .eq("id", bookId)
-        .single();
+    // Fetch the correct URL based on format
+    if (format === "PDF" || format === "Audio") {
+      // Only fetch from DB if we don't have the URL we need
+      const needPdf = format === "PDF" && !pdf;
+      const needAudio = format === "Audio" && !audio;
+      
+      if (needPdf || needAudio) {
+        const { data: bookRow, error: bookErr } = await supabaseAdmin
+          .from("books")
+          .select("title, pdf_url, audio_url")
+          .eq("id", bookId)
+          .single();
 
-      if (!bookErr && bookRow) {
-        if (!bookTitle && bookRow.title) (body as any).bookTitle = bookRow.title;
-        pdf = pdf || bookRow.pdf_url || null;
-        audio = audio || bookRow.audio_url || null;
+        if (!bookErr && bookRow) {
+          if (!bookTitle && bookRow.title) (body as any).bookTitle = bookRow.title;
+          if (needPdf) pdf = bookRow.pdf_url || null;
+          if (needAudio) audio = bookRow.audio_url || null;
+        }
       }
     }
 
@@ -214,12 +224,12 @@ export async function POST(req: Request) {
       quantity,
       shipping_address: address || null,
       notes: notes || null,
-      payment_status: "paid",
+      payment_status: free ? "free" : "paid",
 
-      currency: currency || "NGN",
-      unit_price: unitPrice ?? null,
-      total_amount: total ?? null,
-      payment_ref: reference,
+      currency: free ? null : (currency || "NGN"),
+      unit_price: free ? null : (unitPrice ?? null),
+      total_amount: free ? null : (total ?? null),
+      payment_ref: free ? null : reference,
 
       // 🚀 make DB reflect the UI
       delivered: deliveredInitial,
@@ -233,54 +243,90 @@ export async function POST(req: Request) {
     let mailed = false;
     if (SMTP_HOST && SMTP_USER && SMTP_PASS && emailFinal) {
       try {
+        console.log("[notify-purchase] Sending email to:", emailFinal);
         const transporter = nodemailer.createTransport({
           host: SMTP_HOST,
           port: SMTP_PORT,
           secure: SMTP_SECURE,
           auth: { user: SMTP_USER, pass: SMTP_PASS },
+          connectionTimeout: 10000, // 10 seconds
+          greetingTimeout: 10000,
+          socketTimeout: 10000,
+          // Serverless-friendly configuration - removed blocking verify()
+          // The actual sendMail() will establish connection when needed
         });
 
         const titleBase = makeSafeFilename(bookTitle || "Book");
 
-        const MAX_ATTACH = 20 * 1024 * 1024;
+        const MAX_ATTACH = 20 * 1024 * 1024; // 20MB limit for email attachments
         const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
         let digitalLine = "";
 
         if (format === "PDF") {
-          const file = await downloadFromStorage(pdf || undefined);
-          const ext = preferredExt("PDF", file?.contentType, file?.filename || (pdf as string) || "");
-          const desiredName = `${titleBase}.${ext}`;
-
-          if (file && file.size <= MAX_ATTACH) {
-            attachments.push({
-              filename: desiredName,
-              content: file.buffer,
-              contentType: file.contentType || "application/pdf",
-            });
-            digitalLine = "Your PDF is attached to this email.";
+          if (!pdf) {
+            digitalLine = "PDF file not available. Please contact support.";
+            console.warn("[notify-purchase] PDF URL missing for book:", bookId);
           } else {
-            const link = await createSignedIfPossible(pdf || undefined, desiredName);
-            digitalLine = link
-              ? `Your PDF is ready here (24h link): ${link}`
-              : "We’ll send your PDF shortly.";
+            const file = await downloadFromStorage(pdf);
+            const ext = preferredExt("PDF", file?.contentType, file?.filename || pdf || "");
+            const desiredName = `${titleBase}.${ext}`;
+
+            if (file && file.size <= MAX_ATTACH) {
+              attachments.push({
+                filename: desiredName,
+                content: file.buffer,
+                contentType: file.contentType || "application/pdf",
+              });
+              digitalLine = "Your PDF is attached to this email.";
+              console.log(`[notify-purchase] PDF attached: ${desiredName} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+            } else if (file && file.size > MAX_ATTACH) {
+              // File too large for email attachment, use signed URL
+              const link = await createSignedIfPossible(pdf, desiredName);
+              digitalLine = link
+                ? `Your PDF is too large for email attachment. Download it here (24h link): ${link}`
+                : `Your PDF is too large for email attachment. We'll send you a download link shortly.`;
+              console.log(`[notify-purchase] PDF too large (${(file.size / 1024 / 1024).toFixed(2)}MB), using signed URL`);
+            } else {
+              // Couldn't download from storage, try signed URL as fallback
+              const link = await createSignedIfPossible(pdf, desiredName);
+              digitalLine = link
+                ? `Your PDF is ready here (24h link): ${link}`
+                : "We'll send your PDF shortly.";
+              console.warn("[notify-purchase] Could not download PDF from storage, using signed URL fallback");
+            }
           }
         } else if (format === "Audio") {
-          const file = await downloadFromStorage(audio || undefined);
-          const ext = preferredExt("Audio", file?.contentType, file?.filename || (audio as string) || "");
-          const desiredName = `${titleBase}.${ext}`;
-
-          if (file && file.size <= MAX_ATTACH) {
-            attachments.push({
-              filename: desiredName,
-              content: file.buffer,
-              contentType: file.contentType || "audio/mpeg",
-            });
-            digitalLine = "Your audio file is attached to this email.";
+          if (!audio) {
+            digitalLine = "Audio file not available. Please contact support.";
+            console.warn("[notify-purchase] Audio URL missing for book:", bookId);
           } else {
-            const link = await createSignedIfPossible(audio || undefined, desiredName);
-            digitalLine = link
-              ? `Your audio is ready here (24h link): ${link}`
-              : "We’ll send your audio file shortly.";
+            const file = await downloadFromStorage(audio);
+            const ext = preferredExt("Audio", file?.contentType, file?.filename || audio || "");
+            const desiredName = `${titleBase}.${ext}`;
+
+            if (file && file.size <= MAX_ATTACH) {
+              attachments.push({
+                filename: desiredName,
+                content: file.buffer,
+                contentType: file.contentType || "audio/mpeg",
+              });
+              digitalLine = "Your audio file is attached to this email.";
+              console.log(`[notify-purchase] Audio attached: ${desiredName} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+            } else if (file && file.size > MAX_ATTACH) {
+              // File too large for email attachment, use signed URL
+              const link = await createSignedIfPossible(audio, desiredName);
+              digitalLine = link
+                ? `Your audio file is too large for email attachment. Download it here (24h link): ${link}`
+                : `Your audio file is too large for email attachment. We'll send you a download link shortly.`;
+              console.log(`[notify-purchase] Audio too large (${(file.size / 1024 / 1024).toFixed(2)}MB), using signed URL`);
+            } else {
+              // Couldn't download from storage, try signed URL as fallback
+              const link = await createSignedIfPossible(audio, desiredName);
+              digitalLine = link
+                ? `Your audio is ready here (24h link): ${link}`
+                : "We'll send your audio file shortly.";
+              console.warn("[notify-purchase] Could not download audio from storage, using signed URL fallback");
+            }
           }
         }
 
@@ -305,7 +351,7 @@ export async function POST(req: Request) {
         lines.push("");
         lines.push("If anything looks off, just reply to this email and we’ll help.");
 
-        await transporter.sendMail({
+        const mailResult = await transporter.sendMail({
           from: EMAIL_FROM,
           to: emailFinal,
           bcc: ADMIN_EMAIL || undefined,
@@ -314,10 +360,25 @@ export async function POST(req: Request) {
           attachments,
         });
 
+        console.log("[notify-purchase] Email sent successfully:", mailResult.messageId);
         mailed = true;
-      } catch (e) {
-        console.error("[notify-purchase] email error:", e);
+      } catch (emailError: any) {
+        console.error("[notify-purchase] Email sending failed:", emailError?.message || emailError);
+        console.error("[notify-purchase] Email error details:", {
+          code: emailError?.code,
+          command: emailError?.command,
+          response: emailError?.response,
+          responseCode: emailError?.responseCode,
+          errno: emailError?.errno,
+          syscall: emailError?.syscall,
+          hostname: emailError?.hostname,
+          stack: emailError?.stack,
+        });
+        // Don't fail the entire request if email fails - order is already saved
+        mailed = false;
       }
+    } else {
+      console.warn("[notify-purchase] SMTP credentials not configured, skipping email");
     }
 
     return NextResponse.json({ ok: true, mailed });

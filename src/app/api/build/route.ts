@@ -46,6 +46,11 @@ export async function POST(req: Request) {
     port: Number(SMTP_PORT),
     secure: SMTP_SECURE.toLowerCase() === "true",
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
+    // Serverless-friendly configuration - removed blocking verify()
+    // The actual sendMail() will establish connection when needed
   });
 
   // Internal notification to Chris (unchanged)
@@ -87,7 +92,17 @@ export async function POST(req: Request) {
     await Promise.all([internalMail, autoReplyMail]);
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error("Email send failed:", err?.response || err);
+    console.error("[build] Email send failed:", err?.message || err);
+    console.error("[build] Email error details:", {
+      code: err?.code,
+      command: err?.command,
+      response: err?.response,
+      responseCode: err?.responseCode,
+      errno: err?.errno,
+      syscall: err?.syscall,
+      hostname: err?.hostname,
+      stack: err?.stack,
+    });
     return NextResponse.json({ ok:false, error:"Failed to send email. Please try again later." }, { status:500 });
   }
 }
